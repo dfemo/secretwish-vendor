@@ -5,13 +5,13 @@ import { Badge, Card, CardHeader, PageHeader, Stat } from "@/shared/ui/primitive
 import { NotificationPreferences } from "@/shared/ui/account";
 
 export default function SettingsPage() {
-  const { persona } = useSession();
+  const { persona, isDemo } = useSession();
   return (
     <>
       <PageHeader title="Settings" />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Your account" action={<Badge tone="gold">Demo persona</Badge>} />
+          <CardHeader title="Your account" action={isDemo ? <Badge tone="gold">Demo persona</Badge> : undefined} />
           <dl className="grid grid-cols-2 gap-4 p-5">
             <Stat label="Name" value={persona.name} />
             <Stat label="Email" value={<span className="break-all">{persona.email}</span>} />

@@ -2,25 +2,27 @@
 
 import Link from "next/link";
 import { RotateCcw } from "lucide-react";
-import { useApi } from "@/shared/lib/api";
+import { usePagedApi } from "@/shared/lib/api";
+import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
 import { dateTime } from "@/shared/lib/format";
-import { ButtonLink, Card, EmptyState, ErrorState, Notice, PageHeader, ProductArt, Spinner, StatusBadge } from "@/shared/ui/primitives";
+import { ButtonLink, Card, EmptyState, ErrorState, Notice, PageHeader, ProductArt, SearchInput, Spinner, StatusBadge } from "@/shared/ui/primitives";
 import type { VendorOrder } from "@/lib/types";
 
 export default function ReturnsPage() {
-  const { data, error, loading, reload } = useApi<VendorOrder[]>("/vendor/orders");
+  const { data, items, error, loading, reload, setPage, search, setSearch } = usePagedApi<VendorOrder>("/vendor/orders", { status: "returns" }, 20);
   const { fmt } = useSession();
-  const rows = data?.filter((o) => ["RefundRequested", "RefundCompleted", "DeliveryException"].includes(o.status)) ?? [];
+  const rows = items ?? [];
   return (
     <>
       <PageHeader title="Returns & Issues" description="Refund requests, disputes and delivery exceptions on your orders. SecretWish operations make refund decisions and keep you informed." />
       <Notice className="mb-6" tone="info">
         Refunds and chargebacks are decided by SecretWish Finance with evidence from you, the courier and the customer. Orders with an open case are not paid out until resolved.
       </Notice>
+      <SearchInput value={search} onChange={setSearch} label="Search returns" placeholder="Reference or product" className="mb-4 sm:w-80" />
       {loading && <Spinner />}
       {error && <ErrorState error={error} onRetry={reload} />}
-      {data && rows.length === 0 && <EmptyState icon={RotateCcw} title="No open issues" description="Great work — nothing needs attention." />}
+      {data && rows.length === 0 && <EmptyState icon={RotateCcw} title={search ? "No issues match your search" : "No open issues"} description={search ? undefined : "Great work — nothing needs attention."} />}
       <ul className="space-y-3">
         {rows.map((o) => (
           <li key={o.id}>
@@ -36,6 +38,7 @@ export default function ReturnsPage() {
           </li>
         ))}
       </ul>
+      <PagedFooter data={data} onPage={setPage} className="mt-4 rounded-2xl border bg-white" />
     </>
   );
 }

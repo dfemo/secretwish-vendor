@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
-import { api, useApi, useMutation } from "@/shared/lib/api";
+import { api, useMutation, usePagedApi } from "@/shared/lib/api";
+import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
 import { date, timeAgo } from "@/shared/lib/format";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Notice, PageHeader, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Notice, PageHeader, SearchInput, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { Modal, useToast } from "@/shared/ui/overlay";
 
 type Request = {
@@ -14,7 +15,7 @@ type Request = {
 };
 
 export default function QuotesPage() {
-  const { data, error, loading, reload } = useApi<Request[]>("/vendor/quotes");
+  const { data: paged, items: data, error, loading, reload, setPage, search, setSearch } = usePagedApi<Request>("/vendor/quotes", {}, 20);
   const { fmt } = useSession();
   const toast = useToast();
   const [open, setOpen] = useState<Request | null>(null);
@@ -29,7 +30,8 @@ export default function QuotesPage() {
       <PageHeader title="Surprise requests" description="Senders describe a moment and set a budget range. Quote within it — quotes outside the range are flagged to the sender and rarely chosen." />
       {loading && <Spinner />}
       {error && <ErrorState error={error} onRetry={reload} />}
-      {data?.length === 0 && <EmptyState icon={Sparkles} title="No requests in your categories yet" />}
+      <SearchInput value={search} onChange={setSearch} label="Search requests" placeholder="Search by title or reference" className="mb-5 sm:w-80" />
+      {data?.length === 0 && <EmptyState icon={Sparkles} title={search ? "No requests match your search" : "No requests in your categories yet"} />}
       <ul className="grid gap-4 lg:grid-cols-2">
         {data?.map((r) => (
           <li key={r.id}>
@@ -64,6 +66,7 @@ export default function QuotesPage() {
           </li>
         ))}
       </ul>
+      <PagedFooter data={paged} onPage={setPage} className="mt-4 rounded-2xl border bg-white" />
       <Modal
         open={!!open}
         onClose={() => setOpen(null)}

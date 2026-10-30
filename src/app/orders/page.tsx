@@ -1,26 +1,22 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Package } from "lucide-react";
-import { useApi } from "@/shared/lib/api";
+import { usePagedApi } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { date, dateTime, timeAgo } from "@/shared/lib/format";
 import { ORDER_STATUSES, statusMeta } from "@/shared/lib/status";
 import { Card, EmptyState, ErrorState, PageHeader, ProductArt, SearchInput, Select, Spinner, StatusBadge } from "@/shared/ui/primitives";
-import { DataTable, Pagination, type Column } from "@/shared/ui/data";
+import { DataTable, PagedFooter, type Column } from "@/shared/ui/data";
 import type { VendorOrder } from "@/lib/types";
 
-export default function VendorOrders() {
+function VendorOrdersInner() {
   const router = useRouter();
-  const [status, setStatus] = useState("action");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  useEffect(() => setPage(1), [status, search]);
-  const { data, error, loading, reload } = useApi<VendorOrder[]>(`/vendor/orders?status=${status}&search=${encodeURIComponent(search)}`);
+  const [status, setStatus] = useState(useSearchParams().get("status") ?? "action");
+  const { data, items, error, loading, reload, setPage, search, setSearch } = usePagedApi<VendorOrder>("/vendor/orders", { status }, 20);
   const { fmt } = useSession();
-  const pageSize = 10;
-  const rows = data?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+  const rows = items ?? [];
 
   const cols: Column<VendorOrder>[] = [
     {
@@ -52,6 +48,8 @@ export default function VendorOrders() {
           <label htmlFor="st" className="sr-only">Status</label>
           <Select id="st" value={status} onChange={(e) => setStatus(e.target.value)} className="w-56">
             <option value="action">Needs action</option>
+            <option value="active">In fulfilment</option>
+            <option value="returns">Returns &amp; exceptions</option>
             <option value="">All orders</option>
             {ORDER_STATUSES.filter((s) => s !== "PaymentPending").map((s) => (<option key={s} value={s}>{statusMeta(s).label}</option>))}
           </Select>
@@ -61,10 +59,18 @@ export default function VendorOrders() {
         {data && (
           <>
             <DataTable caption="Orders" columns={cols} rows={rows} rowKey={(o) => o.id} onRowClick={(o) => router.push(`/orders/${o.id}`)} rowLabel={(o) => `Open ${o.reference}`} empty={<EmptyState icon={Package} title={status === "action" ? "Nothing needs action" : "No orders match"} />} />
-            <Pagination page={page} pageSize={pageSize} total={data.length} onPage={setPage} />
+            <PagedFooter data={data} onPage={setPage} />
           </>
         )}
       </Card>
     </>
+  );
+}
+
+export default function VendorOrders() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <VendorOrdersInner />
+    </Suspense>
   );
 }

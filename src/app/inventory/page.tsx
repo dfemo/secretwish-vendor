@@ -2,29 +2,31 @@
 
 import { useState } from "react";
 import { ClipboardList, Save } from "lucide-react";
-import { api, useApi, useMutation } from "@/shared/lib/api";
-import { Badge, Button, Card, cx, EmptyState, ErrorState, PageHeader, ProductArt, Spinner, StatusBadge, Switch } from "@/shared/ui/primitives";
+import { api, useMutation, usePagedApi } from "@/shared/lib/api";
+import { PagedFooter } from "@/shared/ui/data";
+import { Badge, Button, Card, cx, EmptyState, ErrorState, PageHeader, ProductArt, SearchInput, Spinner, StatusBadge, Switch } from "@/shared/ui/primitives";
 import { useToast } from "@/shared/ui/overlay";
 import type { VendorProduct } from "@/lib/types";
 
 export default function InventoryPage() {
-  const { data, error, loading, reload } = useApi<VendorProduct[]>("/vendor/products");
   const [lowOnly, setLowOnly] = useState(false);
+  const { data, items, error, loading, reload, setPage, search, setSearch } = usePagedApi<VendorProduct>("/vendor/products", { view: "inventory", lowStock: lowOnly || null }, 25);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const toast = useToast();
   const update = useMutation((id: string, stock: number) => api<{ stock: number; status: string }>(`/vendor/products/${id}/stock`, { method: "PATCH", body: { stock } }));
-  const rows = (data ?? []).filter((p) => !["Draft", "Suspended", "Rejected"].includes(p.status)).filter((p) => !lowOnly || p.stock <= p.lowStockThreshold);
+  const rows = items ?? [];
 
   return (
     <>
       <PageHeader title="Inventory" description="Keep stock accurate so customers never order something you can't send. Items at zero are hidden automatically." />
       <Card>
-        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-2">
+          <SearchInput value={search} onChange={setSearch} label="Search inventory" placeholder="Search products" className="min-w-[200px] flex-1" />
           <div className="w-64"><Switch checked={lowOnly} onChange={setLowOnly} label="Show low stock only" /></div>
         </div>
         {loading && <Spinner />}
         {error && <ErrorState error={error} onRetry={reload} />}
-        {data && rows.length === 0 && <EmptyState icon={ClipboardList} title="Nothing low on stock" />}
+        {data && rows.length === 0 && <EmptyState icon={ClipboardList} title={search ? "No products match your search" : lowOnly ? "Nothing low on stock" : "No stocked products yet"} />}
         <ul className="divide-y divide-ink-100">
           {rows.map((p) => {
             const value = edits[p.id] ?? String(p.stock);
@@ -60,6 +62,7 @@ export default function InventoryPage() {
             );
           })}
         </ul>
+        <PagedFooter data={data} onPage={setPage} />
         {update.error && <p className="px-5 py-3 text-sm text-danger-700">{update.error.message}</p>}
       </Card>
     </>

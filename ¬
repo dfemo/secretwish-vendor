@@ -1,0 +1,47 @@
+- adding vendor
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch main
+# Your branch is up to date with 'origin/main'.
+#
+# Changes to be committed:
+#	new file:   .env.example
+#	new file:   .gitignore
+#	new file:   next.config.ts
+#	new file:   package-lock.json
+#	new file:   package.json
+#	new file:   src/app/analytics/page.tsx
+#	new file:   src/app/fulfilment/page.tsx
+#	new file:   src/app/globals.css
+#	new file:   src/app/inventory/page.tsx
+#	new file:   src/app/layout.tsx
+#	new file:   src/app/not-found.tsx
+#	new file:   src/app/orders/[id]/page.tsx
+#	new file:   src/app/orders/page.tsx
+#	new file:   src/app/page.tsx
+#	new file:   src/app/payouts/page.tsx
+#	new file:   src/app/products/[id]/page.tsx
+#	new file:   src/app/products/new/page.tsx
+#	new file:   src/app/products/page.tsx
+#	new file:   src/app/providers.tsx
+#	new file:   src/app/quotes/page.tsx
+#	new file:   src/app/returns/page.tsx
+#	new file:   src/app/settings/page.tsx
+#	new file:   src/app/store/page.tsx
+#	new file:   src/app/support/page.tsx
+#	new file:   src/components/product-editor.tsx
+#	new file:   src/lib/types.ts
+#	new file:   src/shared/layout/shell.tsx
+#	new file:   src/shared/lib/api.ts
+#	new file:   src/shared/lib/format.ts
+#	new file:   src/shared/lib/session.tsx
+#	new file:   src/shared/lib/status.ts
+#	new file:   src/shared/ui/account.tsx
+#	new file:   src/shared/ui/charts.tsx
+#	new file:   src/shared/ui/data.tsx
+#	new file:   src/shared/ui/order-actions.tsx
+#	new file:   src/shared/ui/overlay.tsx
+#	new file:   src/shared/ui/primitives.tsx
+#	new file:   tsconfig.json
+#

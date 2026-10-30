@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Boxes, Pencil, Plus, Send, Trash2 } from "lucide-react";
-import { api, useApi, useMutation } from "@/shared/lib/api";
+import { api, useMutation, usePagedApi } from "@/shared/lib/api";
+import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
-import { Button, ButtonLink, Card, EmptyState, ErrorState, PageHeader, ProductArt, Spinner, StatusBadge, Tabs } from "@/shared/ui/primitives";
+import { Button, ButtonLink, Card, EmptyState, ErrorState, PageHeader, ProductArt, SearchInput, Spinner, StatusBadge, Tabs } from "@/shared/ui/primitives";
 import { ConfirmDialog, useToast } from "@/shared/ui/overlay";
 import type { VendorProduct } from "@/lib/types";
 
@@ -13,22 +14,24 @@ const tabs = ["All", "Approved", "PendingReview", "Draft", "Rejected", "OutOfSto
 const labels: Record<string, string> = { All: "All", Approved: "Live", PendingReview: "Pending review", Draft: "Drafts", Rejected: "Rejected", OutOfStock: "Out of stock", Suspended: "Suspended" };
 
 export default function ProductsPage() {
-  const { data, error, loading, reload } = useApi<VendorProduct[]>("/vendor/products");
   const [tab, setTab] = useState<(typeof tabs)[number]>("All");
+  const { data, items, error, loading, reload, setPage, search, setSearch } = usePagedApi<VendorProduct>("/vendor/products", { status: tab === "All" ? null : tab }, 24);
   const [deleting, setDeleting] = useState<VendorProduct | null>(null);
   const { fmt } = useSession();
   const toast = useToast();
   const submit = useMutation((id: string) => api(`/vendor/products/${id}/submit`, { method: "POST" }));
   const del = useMutation(async (id: string) => { await api(`/vendor/products/${id}`, { method: "DELETE" }); return true; });
-  const rows = data?.filter((p) => tab === "All" || p.status === tab) ?? [];
+  const rows = items ?? [];
+  const count = (t: string) => (t === "All" ? Object.values(data?.counts ?? {}).reduce((a, b) => a + b, 0) : (data?.counts?.[t] ?? 0));
 
   return (
     <>
       <PageHeader title="Products" description="New listings and material edits are reviewed by SecretWish before customers can see them." actions={<ButtonLink href="/products/new" icon={Plus}>New product</ButtonLink>} />
-      <Tabs className="mb-5" value={tab} onChange={setTab} tabs={tabs.map((t) => ({ value: t, label: labels[t], count: t === "All" ? data?.length : data?.filter((p) => p.status === t).length }))} />
+      <Tabs className="mb-5" value={tab} onChange={setTab} tabs={tabs.map((t) => ({ value: t, label: labels[t], count: data ? count(t) : undefined }))} />
+      <SearchInput value={search} onChange={setSearch} label="Search products" placeholder="Search your products" className="mb-5 sm:w-80" />
       {loading && <Spinner />}
       {error && <ErrorState error={error} onRetry={reload} />}
-      {data && rows.length === 0 && <EmptyState icon={Boxes} title="No products here" action={<ButtonLink href="/products/new">Create a product</ButtonLink>} />}
+      {data && rows.length === 0 && <EmptyState icon={Boxes} title={search ? "No products match your search" : "No products here"} action={search ? undefined : <ButtonLink href="/products/new">Create a product</ButtonLink>} />}
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {rows.map((p) => (
           <li key={p.id}>
@@ -62,6 +65,7 @@ export default function ProductsPage() {
           </li>
         ))}
       </ul>
+      <PagedFooter data={data} onPage={setPage} className="mt-4 rounded-2xl border bg-white" />
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
