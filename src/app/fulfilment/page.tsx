@@ -12,7 +12,7 @@ import type { VendorOrder } from "@/lib/types";
 const columns = [
   { status: "AwaitingVendorAcceptance", title: "To accept", hint: "Respond within 12 hours" },
   { status: "Processing", title: "Preparing", hint: "Pack discreetly, then dispatch" },
-  { status: "Dispatched", title: "With courier", hint: "Delivery confirmed by recipient code or ops" },
+  { status: "Dispatched", title: "With courier", hint: "Confirmed by the recipient's code, the sender or ops" },
   { status: "DeliveryException", title: "Exceptions", hint: "Re-dispatch or contact operations" },
 ];
 

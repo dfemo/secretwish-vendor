@@ -10,7 +10,7 @@ export type VendorOrder = {
   sender: string;
   recipient: { name: string; phone: string; address: string; city: string };
   gift: { giftMessage: string; personalisation: string; discreetPackaging: boolean; hidePrice: boolean };
-  delivery: { deliveryOption: string; deliveryDate: string | null; trackingReference: string | null; courier: string | null; deliveredAt: string | null; deliveryEvidence: string | null };
+  delivery: { deliveryOption: string; deliveryDate: string | null; trackingReference: string | null; courier: string | null; deliveredAt: string | null; deliveryEvidence: string | null; senderApprovedAt: string | null };
   acceptBy: string | null;
   events?: { id: string; at: string; title: string; detail: string; actor: string; internal: boolean }[];
   payout?: { eligible: boolean; reason: string } | null;

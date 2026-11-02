@@ -91,6 +91,8 @@ export default function VendorOrderDetail() {
               <Stat label="Deliver by" value={date(o.delivery.deliveryDate)} />
               <Stat label="Courier" value={o.delivery.courier ?? "—"} />
               <Stat label="Tracking" value={<span className="font-mono text-xs">{o.delivery.trackingReference ?? "—"}</span>} />
+              {o.delivery.deliveredAt && <Stat label="Delivered" value={dateTime(o.delivery.deliveredAt)} />}
+              {o.delivery.deliveredAt && <Stat label="Customer confirmed" value={o.delivery.senderApprovedAt ? dateTime(o.delivery.senderApprovedAt) : "Not yet"} />}
             </dl>
           </Card>
           <Card>
@@ -108,7 +110,7 @@ export default function VendorOrderDetail() {
           </Card>
           {o.status === "Dispatched" && (
             <Notice tone="info" icon={Info} title="How delivery is confirmed">
-              Delivery is confirmed when the recipient enters the secret code from their gift card, or by SecretWish operations with courier proof of delivery. Vendors can&apos;t mark orders as delivered.
+              Delivery is confirmed when the recipient enters the secret code from their gift card, by the sender if the recipient isn&apos;t on SecretWish, or by SecretWish operations with courier proof of delivery. Vendors can&apos;t mark orders as delivered. If the sender then confirms they&apos;re satisfied, your payout doesn&apos;t wait for the hold period.
             </Notice>
           )}
         </div>
