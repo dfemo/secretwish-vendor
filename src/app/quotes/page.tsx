@@ -1,22 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Paperclip, Sparkles, X } from "lucide-react";
 import { api, useMutation, usePagedApi } from "@/shared/lib/api";
 import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
 import { date, moneyIn, timeAgo } from "@/shared/lib/format";
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Notice, PageHeader, SearchInput, Select, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { Modal, useToast } from "@/shared/ui/overlay";
+import { InvoiceButton, type Invoice } from "@/shared/ui/invoice";
 
 type Request = {
   id: string; reference: string; title: string; budgetMin: number; budgetMax: number; currency: string; budgetMinLocal: number; budgetMaxLocal: number; deliveryCity: string; neededBy?: string; notes: string; status: string; createdAt: string; category: string; recipient: string; quotesReceived: number;
   /** Everything the sender wants; one quote covers the whole list. */
   items: { id: string; name: string; category: string; emoji: string; quantity: number; notes: string }[];
-  myQuote: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string } | null;
+  myQuote: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; invoice: Invoice | null } | null;
   /** Set when the sender is sourcing a wish from someone's wishlist: exactly what they asked for. */
   wish: { title: string; url: string | null; imageUrl: string | null; estimatedPriceUsd: number | null } | null;
 };
+
+type Upload = { fileName: string; dataBase64: string; size: number };
+
+function readFile(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
 
 export default function QuotesPage() {
   const [category, setCategory] = useState("");
@@ -26,12 +38,13 @@ export default function QuotesPage() {
   const toast = useToast();
   const [open, setOpen] = useState<Request | null>(null);
   const [form, setForm] = useState({ description: "", price: "" });
+  const [invoice, setInvoice] = useState<Upload | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   // Vendors quote in the currency the sender budgeted in; the API stores USD at the same rate.
   const rateOf = (r: Request) => (r.budgetMax > 0 && r.budgetMaxLocal > 0 ? r.budgetMaxLocal / r.budgetMax : 1);
   const price = Number(form.price);
   const priceUsd = open ? Math.round((price / rateOf(open)) * 100) / 100 : 0;
-  const submit = useMutation(() => api<{ overBudget: boolean }>("/vendor/quotes", { method: "POST", body: { requestId: open!.id, description: form.description, priceUsd } }));
+  const submit = useMutation(() => api<{ overBudget: boolean }>("/vendor/quotes", { method: "POST", body: { requestId: open!.id, description: form.description, priceUsd, invoice: invoice && { fileName: invoice.fileName, dataBase64: invoice.dataBase64 } } }));
   const outside = open && price > 0 && (price > open.budgetMaxLocal || price < open.budgetMinLocal);
 
   return (
@@ -100,11 +113,12 @@ export default function QuotesPage() {
                 {r.myQuote ? (
                   <div className="rounded-xl bg-ink-50 p-3 text-[13px]">
                     <p className="flex items-center justify-between font-semibold">Your quote: {fmt(r.myQuote.priceUsd)} <StatusBadge status={r.myQuote.status} /></p>
-                    <p className="text-ink-700">{r.myQuote.description}</p>
+                    {r.myQuote.description && <p className="whitespace-pre-line text-ink-700">{r.myQuote.description}</p>}
+                    {r.myQuote.invoice && <div className="mt-2"><InvoiceButton invoice={r.myQuote.invoice} title={`Your invoice for ${r.reference}`} /></div>}
                     {r.myQuote.overBudget && <p className="mt-1 text-xs font-semibold text-warning-700">Outside the sender&apos;s range</p>}
                   </div>
                 ) : r.status === "Open" || r.status === "Quoted" ? (
-                  <Button onClick={() => { setOpen(r); setForm({ description: "", price: "" }); setErrors({}); }}>Send a quote</Button>
+                  <Button onClick={() => { setOpen(r); setForm({ description: "", price: "" }); setInvoice(null); setErrors({}); }}>Send a quote</Button>
                 ) : (
                   <p className="text-sm text-ink-500">This request has closed.</p>
                 )}
@@ -126,7 +140,7 @@ export default function QuotesPage() {
               loading={submit.pending}
               onClick={async () => {
                 const e: Record<string, string> = {};
-                if (form.description.trim().length < 15) e.description = "Describe what you'll send (at least 15 characters).";
+                if (!invoice && form.description.trim().length < 15) e.description = "Describe what you'll send (at least 15 characters) or upload your invoice.";
                 if (!(price >= 1)) e.price = "Enter your price.";
                 setErrors(e);
                 if (Object.keys(e).length) return;
@@ -148,8 +162,37 @@ export default function QuotesPage() {
               Your price must cover every item: {open.items.map((i) => (i.quantity > 1 ? `${i.quantity}× ${i.name}` : i.name)).join(", ")}.
             </Notice>
           )}
-          <Field label="What will you send?" required error={errors.description}>
-            {(id, d) => <Textarea id={id} aria-describedby={d} aria-invalid={!!errors.description} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />}
+          <Field label="What will you send?" required error={errors.description} hint="Type or paste the details, upload your invoice, or both.">
+            {(id, d) => <Textarea id={id} aria-describedby={d} aria-invalid={!!errors.description} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder={invoice ? "Optional: add a short note for the sender" : undefined} />}
+          </Field>
+          <Field label="Invoice (optional)" error={errors.invoice || submit.error?.errors?.invoice?.[0]} hint="PDF or photo (JPG, PNG, WebP), up to 5 MB. The sender previews it on SecretWish and can compare it with other quotes.">
+            {(id, d) =>
+              invoice ? (
+                <div className="flex items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-[13px]">
+                  <Paperclip className="size-4 shrink-0 text-plum-700" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate font-semibold text-ink-900">{invoice.fileName}</span>
+                  <span className="text-xs text-ink-500 tabular">{(invoice.size / 1024 / 1024).toFixed(1)} MB</span>
+                  <button type="button" onClick={() => setInvoice(null)} className="rounded-lg p-1 text-ink-500 hover:bg-white hover:text-danger-700" aria-label="Remove invoice">
+                    <X className="size-4" />
+                  </button>
+                </div>
+              ) : (
+                <input
+                  id={id}
+                  aria-describedby={d}
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  className="block w-full text-sm text-ink-700 file:mr-3 file:rounded-full file:border-0 file:bg-plum-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-plum-700"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 5 * 1024 * 1024) return setErrors({ ...errors, invoice: "Files must be 5 MB or smaller." });
+                    setErrors({ ...errors, invoice: "", description: "" });
+                    setInvoice({ fileName: f.name, dataBase64: await readFile(f), size: f.size });
+                  }}
+                />
+              )
+            }
           </Field>
           <Field label={open && open.items.length > 1 ? `Total price for all items, incl. delivery (${open.currency})` : `Price incl. delivery (${open?.currency ?? "USD"})`} required error={errors.price}>
             {(id, d) => <Input id={id} aria-describedby={d} aria-invalid={!!errors.price} type="number" min={1} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-40" />}
