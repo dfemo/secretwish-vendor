@@ -1,11 +1,12 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { LogIn, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
+import { ArrowLeft, LogIn, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
 import { UserManager, WebStorageStateStore } from "oidc-client-ts";
 import { API_URL, api, setAccessTokenProvider, setDemoUser, useApi } from "./api";
-import { money, type Currency } from "./format";
+import { guessCurrency, money, type Currency } from "./format";
 import { Avatar, Badge, Button, ErrorState, Logo, Spinner } from "../ui/primitives";
+import { VendorVerification } from "../ui/vendor-kyc";
 
 export type AppName = "admin" | "sender" | "recipient" | "vendor";
 /** Who is signed in, as this app sees them. `role` is the capacity they act in here (their staff role in Admin). */
@@ -18,6 +19,8 @@ export type Meta = {
   commissionRate: number;
   deliveryFees: Record<string, number>;
   demoEnabled?: boolean;
+  /** Currencies people can choose, with units per US dollar (sample rates set by SecretWish operations). */
+  currencies?: { code: string; name: string; perUsd: number }[];
 };
 export type VendorSummary = { id: string; name: string; status: "Pending" | "Approved" | "Rejected" | "Suspended"; decisionReason?: string | null };
 /** The signed-in account from /api/me. One account can send, receive, run a store and hold a staff role. */
@@ -42,7 +45,12 @@ type Session = {
   currency: Currency;
   setCurrency: (c: Currency) => void;
   meta: Meta | undefined;
+  /** Formats a USD amount in the viewer's chosen currency. */
   fmt: (usd: number | null | undefined, opts?: { compact?: boolean }) => string;
+  /** Formats a USD amount in a given currency (e.g. a wishlist's own currency). */
+  fmtIn: (usd: number | null | undefined, currency: Currency, opts?: { compact?: boolean }) => string;
+  /** Units of `currency` per US dollar. */
+  rate: (currency: Currency) => number;
 };
 
 const Ctx = createContext<Session | null>(null);
@@ -73,6 +81,15 @@ function write(key: string, value: string | null) {
 /** The SecretWish sign-in service (the API, or auth.secretwish.com once a custom domain is set up). */
 export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? API_URL;
 const CALLBACK_PATH = "/auth/callback";
+
+/** The public website and the other SecretWish apps, so the sign-in screen can send people elsewhere. */
+// Production builds fall back to the live public website; local development uses the Website app on port 3000.
+export const WEBSITE_URL = process.env.NEXT_PUBLIC_WEBSITE_URL ?? (process.env.NODE_ENV === "production" ? "https://secretwish-web.vercel.app" : "http://localhost:3000");
+const appLinks: { app: AppName; label: string; href: string }[] = [
+  { app: "sender", label: "Send a gift", href: process.env.NEXT_PUBLIC_SENDER_URL ?? "http://localhost:3002" },
+  { app: "recipient", label: "My wishlists", href: process.env.NEXT_PUBLIC_RECIPIENT_URL ?? "http://localhost:3003" },
+  { app: "vendor", label: "Vendor portal", href: process.env.NEXT_PUBLIC_VENDOR_URL ?? "http://localhost:3004" },
+];
 
 let manager: UserManager | null = null;
 /** One OpenID Connect client per app; tokens are refreshed in the background with the refresh token. */
@@ -129,9 +146,16 @@ export function SessionProvider({ app, children, intro }: { app: AppName; childr
   }, []);
 
   useEffect(() => {
-    const c = read("secretwish.currency");
-    if (c === "NGN" || c === "USD") setCurrencyState(c);
-    const metaPromise = api<Meta>("/meta").then((m) => (setMeta(m), m)).catch(() => undefined);
+    const saved = read("secretwish.currency");
+    // A saved choice wins; otherwise default to the currency for where the browser is (₦ in Nigeria).
+    const metaPromise = api<Meta>("/meta")
+      .then((m) => {
+        setMeta(m);
+        const codes = m.currencies?.map((x) => x.code) ?? ["USD", "NGN"];
+        setCurrencyState(saved && codes.includes(saved) ? saved : guessCurrency(codes));
+        return m;
+      })
+      .catch(() => undefined);
 
     (async () => {
       const mgr = auth(app);
@@ -222,7 +246,9 @@ export function SessionProvider({ app, children, intro }: { app: AppName; childr
             currency,
             setCurrency,
             meta,
-            fmt: (usd, opts) => money(usd, currency, meta?.fxRateNgn ?? 1550, opts),
+            fmt: (usd, opts) => money(usd, currency, rateOf(meta, currency), opts),
+            fmtIn: (usd, code, opts) => money(usd, code, rateOf(meta, code), opts),
+            rate: (code) => rateOf(meta, code),
           }
         : null,
     [app, persona, state, signOut, currency, setCurrency, meta],
@@ -236,6 +262,11 @@ export function SessionProvider({ app, children, intro }: { app: AppName; childr
       <AccessGate onProfileChange={loadProfile}>{children}</AccessGate>
     </Ctx.Provider>
   );
+}
+
+function rateOf(meta: Meta | undefined, code: Currency) {
+  if (code === "USD") return 1;
+  return meta?.currencies?.find((c) => c.code === code)?.perUsd ?? (code === "NGN" ? (meta?.fxRateNgn ?? 1550) : 1);
 }
 
 function Centered({ children }: { children: ReactNode }) {
@@ -254,7 +285,7 @@ function AccessGate({ children, onProfileChange }: { children: ReactNode; onProf
       <Centered>
         <Logo suffix="Operations" />
         <h1 className="mt-6 font-display text-2xl font-semibold text-plum-900">No team access</h1>
-        <p className="mt-2 text-sm text-ink-500">You&apos;re signed in as {persona.email || persona.name}, but this account isn&apos;t part of the SecretWish team. An operations admin can give you access.</p>
+        <p className="mt-2 text-sm text-ink-500">You&apos;re signed in as {persona.email || persona.name}, but this account isn&apos;t part of the SecretWish team. Team access can only be given by a SecretWish super admin.</p>
         <Button className="mt-5" variant="secondary" onClick={signOut}>Sign out</Button>
       </Centered>
     );
@@ -292,12 +323,8 @@ function OpenYourStore({ vendor, onSubmitted }: { vendor: VendorSummary | null; 
     <main className="min-h-screen bg-plum-950 px-4 py-10 text-ivory-50">
       <div className="mx-auto max-w-lg rounded-3xl bg-ivory-50 p-6 text-ink-900 shadow-[var(--shadow-pop)]">
         <Logo suffix="Vendor" />
-        {vendor?.status === "Pending" && (
-          <>
-            <h1 className="mt-6 font-display text-2xl font-semibold text-plum-900">Your store is under review</h1>
-            <p className="mt-2 text-sm text-ink-500">Thanks for applying with <strong>{vendor.name}</strong>. Our team checks every store before it can sell; we&apos;ll notify you as soon as it&apos;s approved.</p>
-          </>
-        )}
+        {/* Pending stores send their verification documents here; review starts once all three are in. */}
+        {vendor?.status === "Pending" && <VendorVerification storeName={vendor.name} />}
         {vendor?.status === "Suspended" && (
           <>
             <h1 className="mt-6 font-display text-2xl font-semibold text-plum-900">Your store is suspended</h1>
@@ -326,6 +353,21 @@ function OpenYourStore({ vendor, onSubmitted }: { vendor: VendorSummary | null; 
 function SignInChooser({ app, intro, demoEnabled, onPick }: { app: AppName; intro: ReactNode; demoEnabled: boolean; onPick: (p: Persona) => void }) {
   return (
     <main className="min-h-screen bg-plum-950 px-4 py-10 text-ivory-50">
+      <nav aria-label="Other SecretWish apps" className="mx-auto mb-8 flex max-w-5xl flex-wrap items-center justify-between gap-3 text-[13px]">
+        <a href={WEBSITE_URL} className="inline-flex items-center gap-1.5 font-semibold text-plum-300 hover:text-ivory-50">
+          <ArrowLeft className="size-4" aria-hidden /> Back to SecretWish home
+        </a>
+        {app !== "admin" && (
+          <span className="flex flex-wrap items-center gap-1">
+            <span className="mr-1 text-plum-300">Switch to</span>
+            {appLinks.filter((l) => l.app !== app).map((l) => (
+              <a key={l.app} href={l.href} className="rounded-full border border-plum-700 px-3 py-1 font-semibold text-ivory-50 hover:border-gold-400 hover:text-gold-400">
+                {l.label}
+              </a>
+            ))}
+          </span>
+        )}
+      </nav>
       <div className="mx-auto grid max-w-5xl items-center gap-10 md:grid-cols-[1.1fr_1fr]">
         <div>
           <Logo suffix={app === "admin" ? "Operations" : app === "vendor" ? "Vendor" : undefined} />
@@ -338,7 +380,12 @@ function SignInChooser({ app, intro, demoEnabled, onPick }: { app: AppName; intr
           <h2 className="font-display text-xl font-semibold text-plum-900">Welcome to SecretWish</h2>
           <div className="mt-4 grid gap-2">
             <Button icon={LogIn} onClick={() => startSignIn(app)}>Sign in</Button>
-            <Button icon={UserPlus} variant="secondary" onClick={() => startSignIn(app, "signup")}>Create an account</Button>
+            {app === "admin" ? (
+              // Team accounts are created by a super admin; nobody can sign up as staff.
+              <p className="text-xs text-ink-500">Team accounts are created by a SecretWish super admin. Sign in with the email they added for you.</p>
+            ) : (
+              <Button icon={UserPlus} variant="secondary" onClick={() => startSignIn(app, "signup")}>Create an account</Button>
+            )}
           </div>
           {demoEnabled && <DemoPersonas app={app} onPick={onPick} />}
         </div>

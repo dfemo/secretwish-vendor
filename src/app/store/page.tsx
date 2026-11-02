@@ -6,6 +6,7 @@ import { api, ApiError, useApi, useMutation } from "@/shared/lib/api";
 import { pct } from "@/shared/lib/format";
 import { Avatar, Badge, Button, Card, CardHeader, ErrorState, Field, Input, Notice, PageHeader, PageSkeleton, Select, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { useToast } from "@/shared/ui/overlay";
+import { VendorVerification } from "@/shared/ui/vendor-kyc";
 
 type Me = { vendor: { name: string; contactName: string; email: string; city: string; primaryCategory: string; description: string; status: string; businessVerified: boolean; bankVerified: boolean; idVerified: boolean; rating: number; acceptanceRate: number; onTimeRate: number; plan: string; decisionReason?: string } };
 
@@ -63,6 +64,12 @@ export default function StorePage() {
             </ul>
             {v.decisionReason && <Notice className="mx-5 mb-5">{v.decisionReason}</Notice>}
           </Card>
+          {/* Stores approved before verification existed still need to send their documents. */}
+          {!(v.businessVerified && v.bankVerified && v.idVerified) && (
+            <Card className="px-5 pb-5">
+              <VendorVerification storeName={v.name} />
+            </Card>
+          )}
           <Card>
             <CardHeader title="Performance" description="Visible to SecretWish operations" />
             <dl className="grid grid-cols-2 gap-3 p-5 text-center">
