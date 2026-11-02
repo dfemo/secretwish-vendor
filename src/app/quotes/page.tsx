@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Paperclip, Sparkles, X } from "lucide-react";
-import { api, useMutation, usePagedApi } from "@/shared/lib/api";
+import { api, ApiError, useMutation, usePagedApi } from "@/shared/lib/api";
 import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
 import { date, moneyIn, timeAgo } from "@/shared/lib/format";
@@ -11,7 +11,7 @@ import { Modal, useToast } from "@/shared/ui/overlay";
 import { InvoiceButton, type Invoice } from "@/shared/ui/invoice";
 
 type Request = {
-  id: string; reference: string; title: string; budgetMin: number; budgetMax: number; currency: string; budgetMinLocal: number; budgetMaxLocal: number; deliveryCity: string; neededBy?: string; notes: string; status: string; createdAt: string; category: string; recipient: string; quotesReceived: number;
+  id: string; reference: string; title: string; budgetMin: number; budgetMax: number; currency: string; budgetMinLocal: number; budgetMaxLocal: number; deliveryCity: string; neededBy?: string; notes: string; status: string; createdAt: string; category: string; recipient: string; quotesReceived: number; quoteAccepted: boolean;
   /** Everything the sender wants; one quote covers the whole list. */
   items: { id: string; name: string; category: string; emoji: string; quantity: number; notes: string }[];
   myQuote: { id: string; description: string; priceUsd: number; overBudget: boolean; status: string; invoice: Invoice | null } | null;
@@ -44,7 +44,11 @@ export default function QuotesPage() {
   const rateOf = (r: Request) => (r.budgetMax > 0 && r.budgetMaxLocal > 0 ? r.budgetMaxLocal / r.budgetMax : 1);
   const price = Number(form.price);
   const priceUsd = open ? Math.round((price / rateOf(open)) * 100) / 100 : 0;
-  const submit = useMutation(() => api<{ overBudget: boolean }>("/vendor/quotes", { method: "POST", body: { requestId: open!.id, description: form.description, priceUsd, invoice: invoice && { fileName: invoice.fileName, dataBase64: invoice.dataBase64 } } }));
+  const submit = useMutation(() =>
+    api<{ overBudget: boolean; duplicate?: boolean }>("/vendor/quotes", { method: "POST", body: { requestId: open!.id, description: form.description, priceUsd, invoice: invoice && { fileName: invoice.fileName, dataBase64: invoice.dataBase64 } } })
+      // 409: this store already quoted (another tab, or a second submit); show that quote rather than an error.
+      .catch((e) => { if (e instanceof ApiError && e.status === 409) return { overBudget: false, duplicate: true }; throw e; }),
+  );
   const outside = open && price > 0 && (price > open.budgetMaxLocal || price < open.budgetMinLocal);
 
   return (
@@ -117,10 +121,10 @@ export default function QuotesPage() {
                     {r.myQuote.invoice && <div className="mt-2"><InvoiceButton invoice={r.myQuote.invoice} title={`Your invoice for ${r.reference}`} /></div>}
                     {r.myQuote.overBudget && <p className="mt-1 text-xs font-semibold text-warning-700">Outside the sender&apos;s range</p>}
                   </div>
-                ) : r.status === "Open" || r.status === "Quoted" ? (
+                ) : !r.quoteAccepted && (r.status === "Open" || r.status === "Quoted") ? (
                   <Button onClick={() => { setOpen(r); setForm({ description: "", price: "" }); setInvoice(null); setErrors({}); }}>Send a quote</Button>
                 ) : (
-                  <p className="text-sm text-ink-500">This request has closed.</p>
+                  <p className="text-sm text-ink-500">{r.quoteAccepted ? "The sender has chosen a vendor for this request." : "This request has closed."}</p>
                 )}
               </div>
             </Card>
@@ -145,7 +149,10 @@ export default function QuotesPage() {
                 setErrors(e);
                 if (Object.keys(e).length) return;
                 const r = await submit.run();
-                if (r) {
+                if (r?.duplicate) {
+                  toast({ tone: "info", title: "You've already quoted on this request", body: "You can send one quote per request." });
+                  setOpen(null);
+                } else if (r) {
                   toast({ tone: r.overBudget ? "info" : "success", title: "Quote sent", body: r.overBudget ? "It's flagged to the sender as outside their range." : "The sender has been notified." });
                   setOpen(null);
                 }
