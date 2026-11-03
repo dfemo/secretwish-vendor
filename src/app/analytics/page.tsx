@@ -9,6 +9,7 @@ import { BarsChart, ChartCard } from "@/shared/ui/charts";
 
 type Analytics = {
   days: number;
+  sampleData: boolean;
   totals: { sales: number; net: number; orders: number; aov: number; refundRate: number; lateRate: number };
   weekly: { week: string; sales: number; orders: number }[];
   products: { product: string; units: number; sales: number }[];
@@ -26,7 +27,7 @@ export default function AnalyticsPage() {
         description="Sales exclude cancelled and refunded orders. Net is after SecretWish commission."
         actions={
           <>
-            <SampleDataBadge />
+            {data?.sampleData && <SampleDataBadge />}
             <label htmlFor="d" className="sr-only">Date range</label>
             <Select id="d" value={days} onChange={(e) => setDays(Number(e.target.value))} className="w-40">
               <option value={30}>Last 30 days</option>

@@ -11,6 +11,8 @@ import { ChartCard, TrendChart } from "@/shared/ui/charts";
 
 type Overview = {
   vendor: { name: string; status: string };
+  /** True only for the seeded sample stores. */
+  sampleData: boolean;
   kpis: { sales: number; orders: number; requiringAction: number; awaitingAcceptance: number; productsListed: number; lowStock: number; refundCases: number; pendingPayout: number; processingPayout: number; acceptanceRate: number; onTimeRate: number; avgFulfilmentHours: number; rating: number };
   trend: { date: string; sales: number; orders: number }[];
   actionQueue: { id: string; reference: string; status: string; createdAt: string; product: string; emoji: string; deliveryDate: string; acceptBy: string | null }[];
@@ -34,7 +36,7 @@ export default function VendorOverview() {
         description="Your orders, stock and payouts at a glance."
         actions={
           <>
-            <SampleDataBadge />
+            {data.sampleData && <SampleDataBadge />}
             <label htmlFor="d" className="sr-only">Date range</label>
             <Select id="d" value={days} onChange={(e) => setDays(Number(e.target.value))} className="w-40">
               <option value={7}>Last 7 days</option>
