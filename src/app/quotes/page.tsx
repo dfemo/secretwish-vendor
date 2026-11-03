@@ -111,7 +111,8 @@ export default function QuotesPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge tone="gold">Budget {moneyIn(r.budgetMinLocal, r.currency)} – {moneyIn(r.budgetMaxLocal, r.currency)}</Badge>
                 {r.currency !== "USD" && <Badge tone="neutral">≈ {fmt(r.budgetMin)} – {fmt(r.budgetMax)}</Badge>}
-                <Badge tone="neutral">{r.quotesReceived} quote{r.quotesReceived === 1 ? "" : "s"} so far</Badge>
+                {/* "so far" only while vendors can still quote; afterwards it's the final count. */}
+                <Badge tone="neutral">{r.quotesReceived} quote{r.quotesReceived === 1 ? "" : "s"} {r.status === "Open" || r.status === "Quoted" ? "so far" : "received"}</Badge>
               </div>
               <div className="mt-auto pt-4">
                 {r.myQuote ? (
