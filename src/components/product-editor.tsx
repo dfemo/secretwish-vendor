@@ -64,8 +64,8 @@ export function ProductEditor({ product }: { product?: VendorProduct }) {
 
   const body = () => ({ ...f, priceUsd: Number(f.priceUsd), stock: Number(f.stock), lowStockThreshold: Number(f.lowStockThreshold), imageUrls: images });
   const save = useMutation(async (submit: boolean) => {
-    const saved = await api<{ id: string; status: string }>(product ? `/vendor/products/${product.id}` : "/vendor/products", { method: product ? "PUT" : "POST", body: body() });
-    if (submit && (saved.status === "Draft" || saved.status === "Rejected")) return api<{ id: string; status: string }>(`/vendor/products/${saved.id}/submit`, { method: "POST" });
+    const saved = await api<{ id: string; status: string; autoApproveAt?: string | null }>(product ? `/vendor/products/${product.id}` : "/vendor/products", { method: product ? "PUT" : "POST", body: body() });
+    if (submit && (saved.status === "Draft" || saved.status === "Rejected")) return api<{ id: string; status: string; autoApproveAt?: string | null }>(`/vendor/products/${saved.id}/submit`, { method: "POST" });
     return saved;
   });
 
@@ -85,7 +85,12 @@ export function ProductEditor({ product }: { product?: VendorProduct }) {
     if (!validate()) return;
     const r = await save.run(forReview);
     if (r) {
-      toast({ tone: "success", title: forReview ? "Submitted for review" : "Saved", body: r.status === "PendingReview" ? "SecretWish will review the listing before it goes live." : `Status: ${r.status}` });
+      const live = r.status === "Approved" || r.status === "OutOfStock";
+      toast({
+        tone: "success",
+        title: live && forReview ? "Your listing is live" : forReview ? "Submitted for review" : "Saved",
+        body: r.status === "PendingReview" ? (r.autoApproveAt ? "It goes live in 24 hours unless SecretWish reviews it sooner." : "SecretWish will review the listing before it goes live.") : live ? (r.status === "OutOfStock" ? "Approved. Add stock so senders can buy it." : "Senders can find it now.") : `Status: ${r.status}`,
+      });
       router.push("/products");
     }
   };

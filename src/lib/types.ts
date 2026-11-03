@@ -29,6 +29,8 @@ export type VendorProduct = {
   lowStockThreshold: number;
   /** Photo links, cover first (empty: show the emoji). */
   images?: string[];
+  /** Waiting listings from vendors on timed approval: when it goes live unless SecretWish reviews it first. */
+  autoApproveAt?: string | null;
   emoji: string;
   tint: string;
   status: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { dateTime } from "@/shared/lib/format";
 import { useState } from "react";
 import { Boxes, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { api, useMutation, usePagedApi } from "@/shared/lib/api";
@@ -46,6 +47,9 @@ export default function ProductsPage() {
                   <StatusBadge status={p.status} />
                 </div>
                 <p className="mt-2 text-sm"><b className="tabular">{fmt(p.priceUsd)}</b> <span className="text-xs text-ink-500">· {p.stock} in stock · {p.deliveryOptions.join(", ")}</span></p>
+                {p.status === "PendingReview" && p.autoApproveAt && (
+                  <p className="mt-2 text-xs font-semibold text-gold-700">Goes live {dateTime(p.autoApproveAt)} unless SecretWish reviews it sooner</p>
+                )}
                 {p.reviewNote && <p className="mt-2 rounded-lg bg-warning-50 px-2 py-1 text-xs text-warning-700">{p.reviewNote}</p>}
                 <div className="mt-auto flex flex-wrap gap-2 pt-4">
                   {p.status !== "Suspended" && (
