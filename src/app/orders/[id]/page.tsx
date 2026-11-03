@@ -82,9 +82,14 @@ export default function VendorOrderDetail() {
         </div>
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Delivery" description="Use only to deliver this order." />
+            <CardHeader title="Delivery" description={o.viaHub ? "Deliver this order to the SecretWish hub. SecretWish delivers it to the recipient." : "Use only to deliver this order."} />
+            {o.viaHub && (
+              <Notice className="mx-5 mt-1" tone={o.hubReceivedAt ? "success" : "info"} title={o.hubReceivedAt ? `SecretWish received it ${date(o.hubReceivedAt)}` : "Deliver to SecretWish"}>
+                {o.hubReceivedAt ? "Your part is done. SecretWish delivers it from here." : "Take it to the SecretWish hub below and mark it dispatched with your courier's tracking. SecretWish marks it received when it arrives."}
+              </Notice>
+            )}
             <dl className="grid grid-cols-2 gap-4 p-5">
-              <Stat label="Recipient" value={o.recipient.name} />
+              <Stat label={o.viaHub ? "Deliver to" : "Recipient"} value={o.recipient.name} />
               <Stat label="Phone" value={<span className="inline-flex items-center gap-1"><Phone className="size-3.5" aria-hidden /> {o.recipient.phone}</span>} />
               <Stat className="col-span-2" label="Address" value={<span className="inline-flex items-start gap-1"><MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {o.recipient.address}</span>} />
               <Stat label="Option" value={o.delivery.deliveryOption} />

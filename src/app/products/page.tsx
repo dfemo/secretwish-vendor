@@ -36,7 +36,7 @@ export default function ProductsPage() {
         {rows.map((p) => (
           <li key={p.id}>
             <Card className="flex h-full flex-col overflow-hidden">
-              <ProductArt emoji={p.emoji} tint={p.tint} size="xl" className="rounded-none" />
+              <ProductArt emoji={p.emoji} tint={p.tint} src={p.images?.[0]} size="xl" className="rounded-none" />
               <div className="flex flex-1 flex-col p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>

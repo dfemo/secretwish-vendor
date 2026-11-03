@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ImagePlus, Send } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, ImagePlus, Send, X } from "lucide-react";
 import { api, ApiError, useMutation } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { Button, Card, CardHeader, cx, Field, Input, Notice, ProductArt, Select, StatusBadge, Textarea } from "@/shared/ui/primitives";
@@ -13,6 +13,7 @@ import type { VendorProduct } from "@/lib/types";
 const emojis = ["🎁", "🧺", "💐", "🌹", "🎂", "🍫", "🕯️", "🧴", "💍", "📿", "👗", "🧣", "🎧", "⌚", "📚", "☕", "🍷", "🛁", "💆", "⛵"];
 const tints = ["lavender", "gold", "ivory", "rose", "sage", "plum"];
 const deliveryOptions = ["Standard", "Express", "Same-day", "E-voucher"];
+const MaxPhotos = 3;
 
 type Form = { name: string; description: string; categoryId: string; priceUsd: string; stock: string; lowStockThreshold: string; emoji: string; tint: string; deliveryOptions: string[] };
 
@@ -22,18 +23,46 @@ export function ProductEditor({ product }: { product?: VendorProduct }) {
   const { meta, fmt } = useSession();
   const [f, setF] = useState<Form>({ name: "", description: "", categoryId: "", priceUsd: "", stock: "10", lowStockThreshold: "5", emoji: "🎁", tint: "lavender", deliveryOptions: ["Standard"] });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [photo, setPhoto] = useState<string | null>(null);
+  // Uploaded photo links, cover first (up to three).
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   useEffect(() => {
-    if (product)
+    if (product) {
       setF({ name: product.name, description: product.description, categoryId: product.categoryId, priceUsd: String(product.priceUsd), stock: String(product.stock), lowStockThreshold: String(product.lowStockThreshold), emoji: product.emoji, tint: product.tint, deliveryOptions: product.deliveryOptions });
+      setImages(product.images ?? []);
+    }
   }, [product]);
-  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
+
+  /** Uploads the chosen photos (as many as still fit) one at a time and adds their links. */
+  const addPhotos = async (files: FileList | null) => {
+    setUploadError(null);
+    const chosen = Array.from(files ?? []).slice(0, MaxPhotos - images.length);
+    if (chosen.some((file) => file.size > 5 * 1024 * 1024)) return setUploadError("Each photo must be 5 MB or smaller.");
+    setUploading(true);
+    try {
+      for (const file of chosen) {
+        const dataBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("That photo couldn't be read."));
+          reader.readAsDataURL(file);
+        });
+        const { url } = await api<{ url: string }>("/vendor/products/images", { method: "POST", body: { fileName: file.name, dataBase64 } });
+        setImages((xs) => [...xs, url].slice(0, MaxPhotos));
+      }
+    } catch (e) {
+      setUploadError((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
   // Default new products to the first category once reference data has loaded.
   useEffect(() => {
     if (!product && meta?.categories.length) setF((x) => (x.categoryId ? x : { ...x, categoryId: meta.categories[0].id }));
   }, [product, meta]);
 
-  const body = () => ({ ...f, priceUsd: Number(f.priceUsd), stock: Number(f.stock), lowStockThreshold: Number(f.lowStockThreshold) });
+  const body = () => ({ ...f, priceUsd: Number(f.priceUsd), stock: Number(f.stock), lowStockThreshold: Number(f.lowStockThreshold), imageUrls: images });
   const save = useMutation(async (submit: boolean) => {
     const saved = await api<{ id: string; status: string }>(product ? `/vendor/products/${product.id}` : "/vendor/products", { method: product ? "PUT" : "POST", body: body() });
     if (submit && (saved.status === "Draft" || saved.status === "Rejected")) return api<{ id: string; status: string }>(`/vendor/products/${saved.id}/submit`, { method: "POST" });
@@ -120,20 +149,37 @@ export function ProductEditor({ product }: { product?: VendorProduct }) {
         </Card>
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Images" description="Upload is simulated in the prototype — files stay in your browser and aren't stored." />
+            <CardHeader title="Photos" description={`Up to ${MaxPhotos} photos (JPG, PNG or WebP, 5 MB each). Senders see them before they buy; the first is the cover. Changing photos on a live listing sends it back for review.`} />
             <div className="space-y-4 p-5">
-              {photo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photo} alt="Preview of the uploaded product photo" className="aspect-[4/3] w-full rounded-2xl object-cover" />
-              ) : (
-                <ProductArt emoji={f.emoji} tint={f.tint} size="xl" label="Listing cover preview" />
+              <ProductArt emoji={f.emoji} tint={f.tint} size="xl" src={images[0]} label={images[0] ? "Cover photo" : "Listing cover preview"} />
+              {images.length > 0 && (
+                <ul className="grid grid-cols-3 gap-2">
+                  {images.map((src, i) => (
+                    <li key={src} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt={`Photo ${i + 1}`} className={cx("aspect-square w-full rounded-xl object-cover", i === 0 && "ring-2 ring-plum-500")} />
+                      <button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => setImages(images.filter((x) => x !== src))} className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink-700 shadow hover:text-danger-700">
+                        <X className="size-3.5" aria-hidden />
+                      </button>
+                      {i > 0 && (
+                        <button type="button" onClick={() => setImages([src, ...images.filter((x) => x !== src)])} className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-plum-800 shadow">
+                          <ArrowLeftRight className="size-3" aria-hidden /> Make cover
+                        </button>
+                      )}
+                      {i === 0 && <span className="absolute bottom-1 left-1 rounded-full bg-plum-800 px-2 py-0.5 text-[11px] font-semibold text-ivory-50">Cover</span>}
+                    </li>
+                  ))}
+                </ul>
               )}
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink-300 px-3 py-3 text-sm font-semibold text-plum-700 hover:bg-plum-50">
-                <ImagePlus className="size-4" aria-hidden /> Choose a photo (preview only)
-                <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; if (file) setPhoto(URL.createObjectURL(file)); }} />
-              </label>
+              {images.length < MaxPhotos && (
+                <label className={cx("flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink-300 px-3 py-3 text-sm font-semibold text-plum-700 hover:bg-plum-50", uploading && "pointer-events-none opacity-60")}>
+                  <ImagePlus className="size-4" aria-hidden /> {uploading ? "Uploading…" : `Add photos (${images.length}/${MaxPhotos})`}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploading} onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
+                </label>
+              )}
+              {(uploadError || err("imageUrls")) && <p className="text-xs font-medium text-danger-700" role="alert">{uploadError ?? err("imageUrls")}</p>}
               <div>
-                <p className="mb-1.5 text-[13px] font-semibold text-ink-700">Cover illustration</p>
+                <p className="mb-1.5 text-[13px] font-semibold text-ink-700">{images.length ? "Illustration (shown where photos can't load)" : "Cover illustration"}</p>
                 <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Cover illustration">
                   {emojis.map((e) => (
                     <button key={e} type="button" role="radio" aria-checked={f.emoji === e} onClick={() => setF({ ...f, emoji: e })} className={cx("grid size-9 place-items-center rounded-lg text-lg", f.emoji === e ? "bg-plum-100 ring-2 ring-plum-500" : "bg-ink-50 hover:bg-ink-100")}>
@@ -151,11 +197,11 @@ export function ProductEditor({ product }: { product?: VendorProduct }) {
           </Card>
           {save.error && !serverErrors && <Notice tone="danger">{save.error.message}</Notice>}
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" loading={save.pending} onClick={() => submit(false)}>
+            <Button variant="secondary" loading={save.pending} disabled={uploading} onClick={() => submit(false)}>
               {product && product.status !== "Draft" ? "Save changes" : "Save draft"}
             </Button>
             {(!product || ["Draft", "Rejected"].includes(product.status)) && (
-              <Button icon={Send} loading={save.pending} onClick={() => submit(true)}>
+              <Button icon={Send} loading={save.pending} disabled={uploading} onClick={() => submit(true)}>
                 Submit for review
               </Button>
             )}
