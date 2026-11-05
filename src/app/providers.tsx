@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BarChart3, Boxes, ClipboardList, HandCoins, LayoutDashboard, LifeBuoy, Package, RotateCcw, Settings, Sparkles, Store, Truck } from "lucide-react";
+import { BarChart3, Boxes, ClipboardList, HandCoins, LayoutDashboard, LifeBuoy, Package, RotateCcw, Settings, Sparkles, Store, Trophy, Truck } from "lucide-react";
 import { useApi } from "@/shared/lib/api";
 import { SessionProvider, useSession } from "@/shared/lib/session";
 import { SidebarShell, type NavSection } from "@/shared/layout/shell";
@@ -32,6 +32,7 @@ function Shell({ children }: { children: ReactNode }) {
       title: "Business",
       items: [
         { href: "/analytics", label: "Sales Analytics", icon: BarChart3 },
+        { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
         { href: "/payouts", label: "Payouts", icon: HandCoins },
         { href: "/store", label: "Store Profile", icon: Store },
       ],
