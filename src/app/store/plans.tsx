@@ -1,0 +1,58 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { api, useApi, useMutation } from "@/shared/lib/api";
+import { useSession } from "@/shared/lib/session";
+import { Badge, Skeleton } from "@/shared/ui/primitives";
+import { useToast } from "@/shared/ui/overlay";
+import { BillingToggle, parsePlanCode, PlanButton, PricingCards, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
+
+/** The vendor plans admins have set, with the store's current one marked. Switching is simulated until billing goes live. */
+export function StorePlans({ current, onChanged }: { current: string; onChanged: () => void }) {
+  const { data: catalog } = useApi<PlanCatalog>("/plans/vendor");
+  const { fmt } = useSession();
+  const toast = useToast();
+  const [billing, setBilling] = useState<Billing>("Yearly");
+  const change = useMutation((plan: string) => api("/vendor/plan", { method: "POST", body: { plan } }));
+  // Open on the period the store pays for.
+  useEffect(() => { const b = parsePlanCode(current).billing; if (b) setBilling(b); }, [current]);
+
+  return (
+    <section id="plans" aria-labelledby="plans-h" className="mt-8 scroll-mt-24 rounded-[32px] bg-[linear-gradient(135deg,#f3eef7_0%,#fbf6e8_100%)] p-4 sm:p-6 md:p-8">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 id="plans-h" className="flex items-center gap-2 font-display text-3xl font-semibold text-plum-900">
+            Subscription <Badge tone="gold">Simulated billing</Badge>
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">Prices are set in USD and shown in your currency. A commission also applies to each order&apos;s product subtotal.</p>
+        </div>
+        <BillingToggle value={billing} onChange={setBilling} />
+      </div>
+      {catalog ? (
+        <PricingCards
+          catalog={catalog}
+          billing={billing}
+          format={(usd) => fmt(usd)}
+          current={current}
+          action={(p, { current: isCurrent, code }) => (
+            <PlanButton
+              plan={p}
+              disabled={isCurrent || change.pending}
+              onClick={async () => {
+                if ((await change.run(code)) !== undefined) {
+                  toast({ tone: "success", title: `Switched to ${p.name}, billed ${billing === "Yearly" ? "yearly" : "monthly"} (simulated)` });
+                  onChanged();
+                }
+              }}
+            >
+              {isCurrent ? "Your plan" : `Choose ${p.name}`}
+            </PlanButton>
+          )}
+        />
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2">{[0, 1].map((i) => <Skeleton key={i} className="h-[480px] rounded-[30px]" />)}</div>
+      )}
+      {change.error && <p role="alert" className="mt-4 text-center text-sm text-danger-700">{change.error.message}</p>}
+    </section>
+  );
+}

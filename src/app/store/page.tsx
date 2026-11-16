@@ -7,6 +7,7 @@ import { pct } from "@/shared/lib/format";
 import { Avatar, Badge, Button, Card, CardHeader, ErrorState, Field, Input, Notice, PageHeader, PageSkeleton, Select, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { useToast } from "@/shared/ui/overlay";
 import { VendorVerification } from "@/shared/ui/vendor-kyc";
+import { StorePlans } from "./plans";
 
 type Me = { vendor: { name: string; contactName: string; email: string; city: string; primaryCategory: string; description: string; status: string; businessVerified: boolean; bankVerified: boolean; idVerified: boolean; rating: number; acceptanceRate: number; onTimeRate: number; plan: string; decisionReason?: string } };
 
@@ -80,10 +81,11 @@ export default function StorePage() {
           <Card className="p-5">
             <p className="text-sm font-semibold">Subscription</p>
             <p className="mt-1 text-sm text-ink-700">{v.plan} <Badge tone="gold" className="ml-1">Simulated billing</Badge></p>
-            <p className="mt-1 text-xs text-ink-500">Vendor plans are monthly, or yearly at a reduced price. Price points to be confirmed.</p>
+            <a href="#plans" className="mt-2 inline-block text-xs font-semibold text-plum-700 hover:underline">Compare plans</a>
           </Card>
         </div>
       </div>
+      <StorePlans current={v.plan} onChanged={reload} />
     </>
   );
 }
