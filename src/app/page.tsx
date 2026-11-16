@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowRight, Boxes, CircleDollarSign, Clock, HandCoins, P
 import { useApi } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
 import { pct, shortDate, timeAgo } from "@/shared/lib/format";
-import { Badge, Card, CardHeader, ErrorState, KpiCard, PageHeader, PageSkeleton, ProductArt, SampleDataBadge, Select, StatusBadge } from "@/shared/ui/primitives";
+import { Badge, Card, CardHeader, ErrorState, KpiCard, PageHeader, PageSkeleton, ProductArt, SampleDataBadge, Select, StatusBadge, useGreeting } from "@/shared/ui/primitives";
 import { ChartCard, TrendChart } from "@/shared/ui/charts";
 
 type Overview = {
@@ -23,7 +23,8 @@ type Overview = {
 export default function VendorOverview() {
   const [days, setDays] = useState(30);
   const { data, error, loading, reload } = useApi<Overview>(`/vendor/overview?days=${days}`);
-  const { fmt } = useSession();
+  const { fmt, persona } = useSession();
+  const { greeting, today } = useGreeting(persona.name);
   if (loading) return <PageSkeleton />;
   if (error || !data) return <ErrorState error={error} onRetry={reload} />;
   const k = data.kpis;
@@ -31,8 +32,8 @@ export default function VendorOverview() {
   return (
     <>
       <PageHeader
-        eyebrow={data.vendor.name}
-        title="Overview"
+        eyebrow={today ? `${data.vendor.name} · ${today}` : data.vendor.name}
+        title={greeting}
         description="Your orders, stock and payouts at a glance."
         actions={
           <>
