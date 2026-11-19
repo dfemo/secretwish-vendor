@@ -8,6 +8,7 @@ import { Avatar, Badge, Button, Card, CardHeader, ErrorState, Field, Input, Noti
 import { useToast } from "@/shared/ui/overlay";
 import { VendorVerification } from "@/shared/ui/vendor-kyc";
 import { StorePlans } from "./plans";
+import { PayoutAccountCard } from "./payout-account";
 
 type Me = { vendor: { name: string; contactName: string; email: string; city: string; primaryCategory: string; description: string; status: string; businessVerified: boolean; bankVerified: boolean; idVerified: boolean; rating: number; acceptanceRate: number; onTimeRate: number; plan: string; decisionReason?: string } };
 
@@ -78,6 +79,7 @@ export default function StorePage() {
               <div className="rounded-xl bg-ink-50 p-3"><dt className="text-xs text-ink-500">On-time</dt><dd className="text-xl font-bold tabular">{pct(v.onTimeRate * 100, 0)}</dd></div>
             </dl>
           </Card>
+          <PayoutAccountCard />
           <Card className="p-5">
             <p className="text-sm font-semibold">Subscription</p>
             <p className="mt-1 text-sm text-ink-700">{v.plan} <Badge tone="gold" className="ml-1">Simulated billing</Badge></p>
