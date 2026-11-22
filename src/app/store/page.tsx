@@ -87,7 +87,7 @@ export default function StorePage() {
           </Card>
         </div>
       </div>
-      <StorePlans current={v.plan} paidUntil={v.planPaidUntil} onChanged={reload} />
+      <StorePlans current={v.plan} onChanged={reload} />
     </>
   );
 }

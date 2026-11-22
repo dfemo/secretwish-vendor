@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { AlertTriangle, ArrowRight, Boxes, CircleDollarSign, Clock, HandCoins, PackageCheck, RotateCcw, ShoppingBag, Timer } from "lucide-react";
 import { useApi } from "@/shared/lib/api";
+import { PlanSummaryCard } from "@/shared/ui/pricing";
 import { useSession } from "@/shared/lib/session";
 import { pct, shortDate, timeAgo } from "@/shared/lib/format";
 import { Badge, Card, CardHeader, ErrorState, KpiCard, PageHeader, PageSkeleton, ProductArt, SampleDataBadge, Select, StatusBadge, useGreeting } from "@/shared/ui/primitives";
@@ -48,6 +49,7 @@ export default function VendorOverview() {
         }
       />
       {data.vendor.status !== "Approved" && <div className="mb-6 rounded-2xl bg-danger-50 px-5 py-4 text-sm font-semibold text-danger-700">Your store is {data.vendor.status.toLowerCase()}. Listings are hidden from customers.</div>}
+      <PlanSummaryCard audience="vendor" manageHref="/store#plans" className="mb-6" />
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <KpiCard tint="gold" icon={CircleDollarSign} label="Total sales" value={fmt(k.sales)} hint="Subtotal + delivery, excl. refunds" />
         <KpiCard tint="plum" icon={ShoppingBag} label="Orders received" value={k.orders} />
