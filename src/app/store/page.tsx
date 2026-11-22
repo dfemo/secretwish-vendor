@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BadgeCheck, CircleX, Star } from "lucide-react";
 import { api, ApiError, useApi, useMutation } from "@/shared/lib/api";
-import { date, pct } from "@/shared/lib/format";
+import { pct } from "@/shared/lib/format";
 import { Avatar, Button, Card, CardHeader, ErrorState, Field, Input, Notice, PageHeader, PageSkeleton, Select, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { useToast } from "@/shared/ui/overlay";
 import { VendorVerification } from "@/shared/ui/vendor-kyc";
@@ -54,6 +54,7 @@ export default function StorePage() {
           </div>
         </Card>
         <div className="space-y-6">
+          <StorePlans current={v.plan} onChanged={reload} />
           <Card>
             <CardHeader title="Account status" action={<StatusBadge status={v.status} />} />
             <ul className="space-y-2 p-5 text-sm">
@@ -80,14 +81,8 @@ export default function StorePage() {
             </dl>
           </Card>
           <PayoutAccountCard />
-          <Card className="p-5">
-            <p className="text-sm font-semibold">Subscription</p>
-            <p className="mt-1 text-sm text-ink-700">{v.plan}{v.planPaidUntil && <span className="text-ink-500"> · paid until {date(v.planPaidUntil)}</span>}</p>
-            <a href="#plans" className="mt-2 inline-block text-xs font-semibold text-plum-700 hover:underline">Compare plans</a>
-          </Card>
         </div>
       </div>
-      <StorePlans current={v.plan} onChanged={reload} />
     </>
   );
 }

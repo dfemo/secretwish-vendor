@@ -8,7 +8,7 @@ import { PaymentReturn } from "@/shared/ui/payment-return";
 export default function PaymentReturnPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>
-      <PaymentReturn home="/store#plans" homeLabel="Back to your store" />
+      <PaymentReturn home="/store" homeLabel="Back to your store" />
     </Suspense>
   );
 }
