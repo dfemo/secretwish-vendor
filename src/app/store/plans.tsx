@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, useApi, useMutation } from "@/shared/lib/api";
+import { useApi } from "@/shared/lib/api";
 import { useSession } from "@/shared/lib/session";
-import { Badge, Skeleton } from "@/shared/ui/primitives";
+import { date } from "@/shared/lib/format";
+import { Skeleton } from "@/shared/ui/primitives";
 import { useToast } from "@/shared/ui/overlay";
-import { BillingToggle, parsePlanCode, PlanButton, PricingCards, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
+import { BillingToggle, parsePlanCode, PlanButton, PricingCards, usePlanChoice, type Billing, type PlanCatalog } from "@/shared/ui/pricing";
 
-/** The vendor plans admins have set, with the store's current one marked. Switching is simulated until billing goes live. */
-export function StorePlans({ current, onChanged }: { current: string; onChanged: () => void }) {
+/** The vendor plans admins have set, with the store's current one marked. A paid plan is paid with the default payment engine and
+ * switches on once the payment is confirmed. */
+export function StorePlans({ current, paidUntil, onChanged }: { current: string; paidUntil?: string | null; onChanged: () => void }) {
   const { data: catalog } = useApi<PlanCatalog>("/plans/vendor");
   const { fmt } = useSession();
   const toast = useToast();
   const [billing, setBilling] = useState<Billing>("Yearly");
-  const change = useMutation((plan: string) => api("/vendor/plan", { method: "POST", body: { plan } }));
+  const change = usePlanChoice("vendor");
   // Open on the period the store pays for.
   useEffect(() => { const b = parsePlanCode(current).billing; if (b) setBilling(b); }, [current]);
 
@@ -22,9 +24,9 @@ export function StorePlans({ current, onChanged }: { current: string; onChanged:
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 id="plans-h" className="flex items-center gap-2 font-display text-3xl font-semibold text-plum-900">
-            Subscription <Badge tone="gold">Simulated billing</Badge>
+            Subscription
           </h2>
-          <p className="mt-1 text-sm text-ink-500">Prices are set in USD and shown in your currency. A commission also applies to each order&apos;s product subtotal.</p>
+          <p className="mt-1 text-sm text-ink-500">Prices are set in USD and shown in your currency. A commission also applies to each order&apos;s product subtotal.{paidUntil && <> Paid until {date(paidUntil)}.</>}</p>
         </div>
         <BillingToggle value={billing} onChange={setBilling} />
       </div>
@@ -39,13 +41,14 @@ export function StorePlans({ current, onChanged }: { current: string; onChanged:
               plan={p}
               disabled={isCurrent || change.pending}
               onClick={async () => {
-                if ((await change.run(code)) !== undefined) {
-                  toast({ tone: "success", title: `Switched to ${p.name}, billed ${billing === "Yearly" ? "yearly" : "monthly"} (simulated)` });
+                const r = await change.choose(code, p.isFree, "/store#plans");
+                if (r?.switched) {
+                  toast({ tone: "success", title: `Switched to ${p.name}` });
                   onChanged();
                 }
               }}
             >
-              {isCurrent ? "Your plan" : `Choose ${p.name}`}
+              {isCurrent ? "Your plan" : p.isFree ? `Switch to ${p.name}` : `Pay for ${p.name}`}
             </PlanButton>
           )}
         />

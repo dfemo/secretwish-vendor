@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { BadgeCheck, CircleX, Star } from "lucide-react";
 import { api, ApiError, useApi, useMutation } from "@/shared/lib/api";
-import { pct } from "@/shared/lib/format";
-import { Avatar, Badge, Button, Card, CardHeader, ErrorState, Field, Input, Notice, PageHeader, PageSkeleton, Select, StatusBadge, Textarea } from "@/shared/ui/primitives";
+import { date, pct } from "@/shared/lib/format";
+import { Avatar, Button, Card, CardHeader, ErrorState, Field, Input, Notice, PageHeader, PageSkeleton, Select, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { useToast } from "@/shared/ui/overlay";
 import { VendorVerification } from "@/shared/ui/vendor-kyc";
 import { StorePlans } from "./plans";
 import { PayoutAccountCard } from "./payout-account";
 
-type Me = { vendor: { name: string; contactName: string; email: string; city: string; primaryCategory: string; description: string; status: string; businessVerified: boolean; bankVerified: boolean; idVerified: boolean; rating: number; acceptanceRate: number; onTimeRate: number; plan: string; decisionReason?: string } };
+type Me = { vendor: { name: string; contactName: string; email: string; city: string; primaryCategory: string; description: string; status: string; businessVerified: boolean; bankVerified: boolean; idVerified: boolean; rating: number; acceptanceRate: number; onTimeRate: number; plan: string; planPaidUntil?: string | null; decisionReason?: string } };
 
 export default function StorePage() {
   const { data, error, loading, reload } = useApi<Me>("/me");
@@ -82,12 +82,12 @@ export default function StorePage() {
           <PayoutAccountCard />
           <Card className="p-5">
             <p className="text-sm font-semibold">Subscription</p>
-            <p className="mt-1 text-sm text-ink-700">{v.plan} <Badge tone="gold" className="ml-1">Simulated billing</Badge></p>
+            <p className="mt-1 text-sm text-ink-700">{v.plan}{v.planPaidUntil && <span className="text-ink-500"> · paid until {date(v.planPaidUntil)}</span>}</p>
             <a href="#plans" className="mt-2 inline-block text-xs font-semibold text-plum-700 hover:underline">Compare plans</a>
           </Card>
         </div>
       </div>
-      <StorePlans current={v.plan} onChanged={reload} />
+      <StorePlans current={v.plan} paidUntil={v.planPaidUntil} onChanged={reload} />
     </>
   );
 }
