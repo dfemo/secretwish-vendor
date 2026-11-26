@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Paperclip, Sparkles, X } from "lucide-react";
+import { Crown, Paperclip, Sparkles, X } from "lucide-react";
 import { api, ApiError, useMutation, usePagedApi } from "@/shared/lib/api";
 import { PagedFooter } from "@/shared/ui/data";
 import { useSession } from "@/shared/lib/session";
 import { date, moneyIn, timeAgo } from "@/shared/lib/format";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Notice, PageHeader, SearchInput, Select, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
+import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, Field, Input, Notice, PageHeader, SearchInput, Select, Spinner, StatusBadge, Textarea } from "@/shared/ui/primitives";
 import { Modal, useToast } from "@/shared/ui/overlay";
 import { InvoiceButton, type Invoice } from "@/shared/ui/invoice";
 
@@ -50,12 +50,22 @@ export default function QuotesPage() {
       .catch((e) => { if (e instanceof ApiError && e.status === 409) return { overBudget: false, duplicate: true }; throw e; }),
   );
   const outside = open && price > 0 && (price > open.budgetMaxLocal || price < open.budgetMinLocal);
+  // Free (or unpaid) plans: one quote ever. 0 means a paid-up plan with unlimited quotes.
+  const limit = paged?.counts?.quoteLimit ?? 0;
+  const used = paged?.counts?.quotesUsed ?? 0;
+  const outOfQuotes = limit > 0 && used >= limit;
 
   return (
     <>
       <PageHeader title="Surprise requests" description="Every request on SecretWish is open to every store. Filter by what you sell, then quote within the sender's budget. Quotes outside the range are flagged to the sender and rarely chosen." />
       {loading && <Spinner />}
       {error && <ErrorState error={error} onRetry={reload} />}
+      {limit > 0 && (
+        <Notice className="mb-5" tone={outOfQuotes ? "warning" : "plum"} icon={Crown} title={outOfQuotes ? "You've used your free quote" : "Your free plan includes one surprise quote"}>
+          <p>{outOfQuotes ? "Upgrade to a paid plan to quote on as many surprise requests as you like." : "Use it on the request that suits you best. Paid plans quote on as many requests as they like."}</p>
+          <ButtonLink href="/store#plans" size="sm" className="mt-2">{outOfQuotes ? "Upgrade your plan" : "Compare plans"}</ButtonLink>
+        </Notice>
+      )}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <SearchInput value={search} onChange={setSearch} label="Search requests" placeholder="Search by title or reference" className="sm:w-80" />
         <label htmlFor="cat" className="sr-only">Category</label>
@@ -121,6 +131,11 @@ export default function QuotesPage() {
                     {r.myQuote.description && <p className="whitespace-pre-line text-ink-700">{r.myQuote.description}</p>}
                     {r.myQuote.invoice && <div className="mt-2"><InvoiceButton invoice={r.myQuote.invoice} title={`Your invoice for ${r.reference}`} /></div>}
                     {r.myQuote.overBudget && <p className="mt-1 text-xs font-semibold text-warning-700">Outside the sender&apos;s range</p>}
+                  </div>
+                ) : !r.quoteAccepted && (r.status === "Open" || r.status === "Quoted") && outOfQuotes ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button disabled title="Your free plan's quote has been used">Send a quote</Button>
+                    <ButtonLink href="/store#plans" size="sm" variant="ghost">Upgrade to quote</ButtonLink>
                   </div>
                 ) : !r.quoteAccepted && (r.status === "Open" || r.status === "Quoted") ? (
                   <Button onClick={() => { setOpen(r); setForm({ description: "", price: "" }); setInvoice(null); setErrors({}); }}>Send a quote</Button>
